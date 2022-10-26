@@ -1,0 +1,127 @@
+// NodeMCU ESP8266 <--->LED
+// D5 <---> ตัวต้านทานที่ต่ออนุกรม LED สีแดงขาบวก
+// D6 <---> ตัวต้านทานที่ต่ออนุกรม LED สีเขียวขาบวก
+// G <---> LED ขาลบ ทั้ง 3 ตัว
+
+//NodeMCU ESP8266 <---> Ultrasonic  
+// D1 = Trig
+// D2 = Echo
+// VV = VCC
+// G = GND
+
+/* จะต้องเรียกไลบรารี่ชุดนี้ทุกครั้งหากใชNodeMCU ESP8266 ้ผ่านแอพ Blynk*/
+#define BLYNK_PRINT Serial // สำหรับ print monitor
+#include <ESP8266WiFi.h> //  ไลบรารี่ของชิป ESP8266 WiFi
+#include <BlynkSimpleEsp8266.h> // ไลบรารี่ส่วนชเื่อมต่อแอพ Blynk
+//#include <SimpleTimer.h>
+
+#define trigPin D1
+#define echoPin D2
+
+char auth[] = "QyRi6Xiv6BXBdnZidXkVxkE-vYOivLGj"; // รหัสเฉพาะสำหรับ Thing (Authen Key) ได้จากแอพ Blynk
+char ssid[] = "CKB-ST0528_2.4GHz";  // ชื่อ WiFi ของบ้าน
+char pass[] = "rjviydso^mujl6fg]p@2563"; //พาสเวิร์ด WiFi
+
+
+
+// ประกาศตัวแปร
+int LED1 = D5; // LED สีแดงเป็นไฟเตือนอันตราย
+int LED2 = D6; // LED สีเขียวเป็นไฟแจ้งปลอดภัย
+int SensorHeight;
+int ObjectHeight;
+
+long duration;
+int distance;
+int safetyDistance; // ตัวแปร ระยะห่างที่แจ้งเตือน
+int FoundObstacle;
+
+
+SimpleTimer timer; // ประกาศให้การนับเวลาใช้ไลบรารี่ SimpleTimer
+WidgetLCD lcd(V8); // Widget จอ LED บนแอพ Blynk
+
+void setup()
+
+ {
+  Serial.begin(9600);
+  
+  Blynk.begin(auth, ssid, pass, "blynk.en-26.com", 9600); // ให้ใช้ค่า Authen Key และ WiFi ตามที่ประกาสตัวแปรไว้
+  
+  timer.setInterval(500L, CheckDistance); // 
+  timer.setInterval(500L, HeightMeter); // 
+  timer.setInterval(2000L, ClearLCD); // 
+  
+  // ประกาศหน้าที่แต่ละขาพินว่าทำหน้าที่ใด
+  pinMode(LED1,OUTPUT);
+  pinMode(LED2,OUTPUT);
+
+
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+
+  delay(500);
+  
+  
+
+ }
+
+
+void CheckDistance()
+{
+digitalWrite(trigPin, LOW);
+delayMicroseconds(2);
+digitalWrite(trigPin, HIGH);
+delayMicroseconds(10);
+digitalWrite(trigPin, LOW);
+duration = pulseIn(echoPin, HIGH);
+distance= duration*0.034/2;
+Serial.print("Distance: ");
+Serial.println(distance);
+safetyDistance = distance;
+//  lcd.clear(); //Use it to clear the LCD Widget
+  lcd.print(0, 0, "Distance  ");
+  lcd.print(10, 0, distance);
+  lcd.print(13, 0, "cm.");  
+  Serial.print("Distance: ");
+  Serial.println(distance);
+
+if ((safetyDistance <= 40) && (safetyDistance > 0)){ // ระยะต่ำกว่า 40 ซมให้แจ้งเตือน และไฟแดงติด
+ // lcd.clear(); //Use it to clear the LCD Widget
+  lcd.print(0, 0, "Warning   ");
+  lcd.print(10, 0, distance);
+  lcd.print(13, 0, " cm.");
+  digitalWrite(LED1, HIGH); //   
+  digitalWrite(LED2, LOW); //       
+  }else {
+  digitalWrite(LED1, LOW); //
+  digitalWrite(LED2, HIGH); //
+   }
+ }
+void ClearLCD()
+ {
+ lcd.clear(); //Use it to clear the LCD Widget
+ }
+
+BLYNK_WRITE(V1) 
+{
+ if (param.asInt()>0) {  // ถ้าค่ามากกว่า 0 แสดงว่าใช้กับเครื่องวัดความสูง  
+  SensorHeight = param.asInt(); // รับค่าตำแหน่งความสูงของจุดติด Sensor 
+ }
+ }
+
+void HeightMeter()  // สำหรับเครื่องวัดความสูง
+{
+    ObjectHeight = (SensorHeight - distance); //ความสูงของจุดติด Sensor -ระยะห่าง = ความสูงของวัตถุที่ถูกวัด
+    lcd.print(0, 1, " Height   ");
+    lcd.print(10, 1, ObjectHeight);
+    lcd.print(13, 1, " cm.");  
+    Serial.print("Height: ");
+    Serial.println(ObjectHeight);
+}
+
+
+
+void loop() 
+{
+ Blynk.run(); 
+ timer.run(); // เพิ่ม loop ตัวควบคุมเวลาการทำงานของฟังชั่น
+}
